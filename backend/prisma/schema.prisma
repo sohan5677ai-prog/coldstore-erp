@@ -1,0 +1,308 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ────────────────────────────────────────────────────
+model User {
+  id             Int              @id @default(autoincrement())
+  username       String           @unique
+  passwordHash   String
+  role           String           @default("operator")
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  inwardEntries  InwardEntry[]
+  outwardEntries OutwardEntry[]
+  vouchers       Voucher[]
+  bills          Bill[]
+  advanceBookings AdvanceBooking[]
+  inwardLoadings  InwardLoading[]
+  reminders       Reminder[]
+}
+
+// ── Chambers & Lots ──────────────────────────────────────────
+model Chamber {
+  id          Int    @id @default(autoincrement())
+  chamberCode String @unique
+  totalLots   Int    @default(200)
+  lots        Lot[]
+}
+
+model Lot {
+  id            Int           @id @default(autoincrement())
+  lotCode       String        @unique
+  lotNumber     Int
+  status        String        @default("empty")
+  chamberId     Int
+  chamber       Chamber       @relation(fields: [chamberId], references: [id])
+  inwardEntries InwardEntry[]
+}
+
+// ── Customers ────────────────────────────────────────────────
+model Customer {
+  id             Int              @id @default(autoincrement())
+  partyCode      String?          @unique
+  customerType   String?          @default("Kishan")
+  name           String
+  address        String?
+  city           String?
+  district       String?
+  state          String?
+  pinCode        String?
+  mobileNumber   String?          @unique
+  phoneNumber    String?
+  email          String?
+  loginId        String?
+  password       String?
+  gstin          String?
+  subGroup       String?          @default("FARMER")
+  guarantor      String?
+  openingBalance Float?           @default(0)
+  obDate         DateTime?
+  aadhaarNo      String?
+  panNo          String?
+  paymentMode    String?          @default("CASH")
+  isBlacklisted  Boolean          @default(false)
+  gstStatus      Boolean          @default(false)
+  palletDetails  String?
+  photoUrl       String?
+  createdAt      DateTime         @default(now())
+  inwardEntries  InwardEntry[]
+  outwardEntries OutwardEntry[]
+  vouchers       Voucher[]
+  bills          Bill[]
+  advanceBookings AdvanceBooking[]
+  reminders       Reminder[]
+}
+
+// ── Commodities & Varieties ───────────────────────────────────
+model Commodity {
+  id        Int       @id @default(autoincrement())
+  name      String
+  type      String    @default("Seasonally")
+  hsnCode   String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  varieties Variety[]
+  packets   Packet[]
+}
+
+model Variety {
+  id            Int           @id @default(autoincrement())
+  name          String
+  storageRate   Float         @default(0)
+  handlingIn    Float         @default(0)
+  handlingOut   Float         @default(0)
+  gstPercent    Float         @default(5)
+  palletLoad    Int           @default(0)
+  stockValue    Float         @default(0)
+  isActive      Boolean       @default(true)
+  commodityId   Int
+  commodity     Commodity     @relation(fields: [commodityId], references: [id])
+  inwardEntries InwardEntry[]
+}
+
+// ── Packets (weight/rent configuration per commodity) ─────────
+model Packet {
+  id                  Int       @id @default(autoincrement())
+  packetName          String
+  weight              Float     @default(0)
+  rentType            String    @default("KG")  
+  billingType         String    @default("Seasonally")
+  rentRateFirstPeriod Float     @default(0)
+  rentRateOtherPeriod Float     @default(0)
+  isZeroRent          Boolean   @default(false)
+  isHalfRent          Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  commodityId         Int
+  commodity           Commodity @relation(fields: [commodityId], references: [id])
+}
+
+// ── Inward Entries ────────────────────────────────────────────
+model InwardEntry {
+  id             Int                  @id @default(autoincrement())
+  csrNo          Int                  @unique
+  inwardDate     DateTime
+  receivedFrom   String?
+  vehicleNo      String?
+  driverNo       String?
+  marka          String?
+  rentType       String               @default("Packet")
+  billingMode    String               @default("Seasonal") 
+  totalWeight    Float?
+  bookingNo      String?
+  chamberNumbers String?              // Multi-chamber string
+  financialYear  String               @default("2025-26")
+  status         String               @default("active")
+  createdAt      DateTime             @default(now())
+  
+  customerId     Int
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  varietyId      Int?
+  variety        Variety?             @relation(fields: [varietyId], references: [id])
+  lotId          Int?
+  lot            Lot?                 @relation(fields: [lotId], references: [id])
+  createdById    Int
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  packetEntries  InwardPacketEntry[]
+  outwardEntries OutwardEntry[]
+  loadings       InwardLoading[]
+}
+
+// ── Inward Packet Entries ─────────────────────────────────────
+model InwardPacketEntry {
+  id          Int         @id @default(autoincrement())
+  packetId    Int?
+  packetName  String
+  avgWeight   Float       @default(0)
+  quantity    Float       @default(0)    
+  totalWeight Float       @default(0)
+  inwardId    Int
+  inward      InwardEntry @relation(fields: [inwardId], references: [id])
+}
+
+// ── Outward Entries ───────────────────────────────────────────
+model OutwardEntry {
+  id             Int         @id @default(autoincrement())
+  outwardNo      String      @unique
+  outwardDate    DateTime
+  bagsOut        Float
+  totalWeight    Float       @default(0)
+  vehicleNo      String?
+  remarks        String?
+  daysStored     Int
+  storageCharge  Float       @default(0)
+  handlingCharge Float       @default(0)
+  gstAmount      Float       @default(0)
+  totalAmount    Float       @default(0)
+  createdAt      DateTime    @default(now())
+  inwardId       Int
+  inward         InwardEntry @relation(fields: [inwardId], references: [id])
+  customerId     Int
+  customer       Customer    @relation(fields: [customerId], references: [id])
+  createdById    Int
+  createdBy      User        @relation(fields: [createdById], references: [id])
+}
+
+// ── Vouchers (payments received) ──────────────────────────────
+model Voucher {
+  id          Int      @id @default(autoincrement())
+  voucherNo   String   @unique
+  voucherDate DateTime
+  voucherType String   @default("Receipt")
+  amount      Float
+  paymentMode String   @default("CASH")
+  referenceNo String?
+  narration   String?
+  createdAt   DateTime @default(now())
+  customerId  Int
+  customer    Customer @relation(fields: [customerId], references: [id])
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+}
+
+// ── Bills ─────────────────────────────────────────────────────
+model Bill {
+  id             Int        @id @default(autoincrement())
+  billNo         String     @unique
+  billDate       DateTime
+  billFrom       DateTime
+  billTo         DateTime
+  storageCharge  Float      @default(0)
+  handlingCharge Float      @default(0)
+  otherCharges   Float      @default(0)
+  cgst           Float      @default(0)
+  sgst           Float      @default(0)
+  totalAmount    Float      @default(0)
+  status         String     @default("draft")
+  notes          String?
+  createdAt      DateTime   @default(now())
+  customerId     Int
+  customer       Customer   @relation(fields: [customerId], references: [id])
+  createdById    Int
+  createdBy      User       @relation(fields: [createdById], references: [id])
+  items          BillItem[]
+}
+
+model BillItem {
+  id             Int    @id @default(autoincrement())
+  csrNo          Int
+  lotCode        String?
+  commodityName  String?
+  varietyName    String?
+  bags           Float
+  days           Int
+  storageRate    Float  @default(0)
+  handlingOut    Float  @default(0)
+  storageCharge  Float  @default(0)
+  handlingCharge Float  @default(0)
+  billId         Int
+  bill           Bill   @relation(fields: [billId], references: [id])
+}
+
+// ── Advance Booking ───────────────────────────────────────────
+model AdvanceBooking {
+  id           Int      @id @default(autoincrement())
+  bookingNo    String   @unique
+  bookingDate  DateTime
+  expectedDate DateTime?
+  commodity    String?
+  variety      String?
+  expectedBags Float?
+  notes        String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id])
+  createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
+}
+
+// ── Inward Loading (labour charges) ──────────────────────────
+model InwardLoading {
+  id             Int         @id @default(autoincrement())
+  loadingDate    DateTime
+  contractorName String?
+  labourCount    Int         @default(0)
+  bags           Float       @default(0)
+  ratePerBag     Float       @default(0)
+  totalAmount    Float       @default(0)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  inwardId       Int
+  inward         InwardEntry @relation(fields: [inwardId], references: [id])
+  createdById    Int
+  createdBy      User        @relation(fields: [createdById], references: [id])
+}
+
+// ── Reminders ─────────────────────────────────────────────────
+model Reminder {
+  id           Int      @id @default(autoincrement())
+  reminderDate DateTime
+  message      String
+  channel      String   @default("note")
+  status       String   @default("pending")
+  amount       Float?
+  createdAt    DateTime @default(now())
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id])
+  createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
+}
+
+model TelegramScan {
+  id          Int      @id @default(autoincrement())
+  passType    String   @default("Inward")  
+  parsedData  Json                          
+  isProcessed Boolean  @default(false)
+  chatId      String?                       
+  rawCaption  String?                       
+  createdAt   DateTime @default(now())
+}

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "OutwardEntry" ADD COLUMN     "totalWeight" DOUBLE PRECISION NOT NULL DEFAULT 0;
